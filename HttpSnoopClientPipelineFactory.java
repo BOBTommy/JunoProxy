@@ -1,9 +1,10 @@
 package Snoop;
 
-import static org.jboss.netty.channel.Channels.*;
+import static org.jboss.netty.channel.Channels.pipeline;
 
 import javax.net.ssl.SSLEngine;
 
+import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ChannelPipelineFactory;
 import org.jboss.netty.handler.codec.http.HttpClientCodec;
@@ -14,9 +15,11 @@ import org.jboss.netty.handler.ssl.SslHandler;
 public class HttpSnoopClientPipelineFactory implements ChannelPipelineFactory{
 
 	private final boolean ssl;
+	private volatile Channel outChat;
 	
-	public HttpSnoopClientPipelineFactory(boolean ssl){
+	public HttpSnoopClientPipelineFactory(boolean ssl, Channel outChat){
 		this.ssl = ssl;
+		this.outChat = outChat;
 	}
 	
 	@Override
@@ -33,7 +36,7 @@ public class HttpSnoopClientPipelineFactory implements ChannelPipelineFactory{
 		pipeline.addLast("clodec", new HttpClientCodec());
 		pipeline.addLast("inflator", new HttpContentDecompressor());
 		
-		pipeline.addLast("handler", new HttpSnoopClientHandler());
+		pipeline.addLast("handler", new HttpSnoopClientHandler(outChat));
 		
 		return pipeline;
 	}

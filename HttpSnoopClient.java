@@ -47,7 +47,7 @@ public class HttpSnoopClient {
 				Executors.newCachedThreadPool(),
 				Executors.newCachedThreadPool()));
 		
-		cbootstrap.setPipelineFactory(new HttpSnoopClientPipelineFactory(ssl));
+		//cbootstrap.setPipelineFactory(new HttpSnoopClientPipelineFactory(ssl));
 		
 		ChannelFuture future = cbootstrap.connect(new InetSocketAddress(host, port));
 		

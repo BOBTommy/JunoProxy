@@ -14,6 +14,12 @@ import org.jboss.netty.util.CharsetUtil;
 
 public class HttpSnoopClientHandler extends SimpleChannelUpstreamHandler{
 	private boolean readingChunks;
+	private volatile Channel outChat;
+	
+	public HttpSnoopClientHandler(Channel outChat){
+		this.outChat = outChat;
+	}
+	
 	@Override
 	public void messageReceived(ChannelHandlerContext ctx, MessageEvent e)throws Exception{
 		if(!readingChunks){
@@ -43,15 +49,15 @@ public class HttpSnoopClientHandler extends SimpleChannelUpstreamHandler{
 					 System.out.println("} END OF CONTENT");
 				}
 			}
-			e.getChannel().write(response).addListener(ChannelFutureListener.CLOSE);
+			outChat.write(response).addListener(ChannelFutureListener.CLOSE);
 		}else {
 			HttpChunk chunk = (HttpChunk) e.getMessage();
 			if(chunk.isLast()){
 				readingChunks = false;
 				System.out.println("} END OF CHUNKED CONTENT");
-				e.getChannel().write(chunk).addListener(ChannelFutureListener.CLOSE);
+				outChat.write(chunk).addListener(ChannelFutureListener.CLOSE);
 			}else{
-				e.getChannel().write(chunk).addListener(ChannelFutureListener.CLOSE);
+				outChat.write(chunk).addListener(ChannelFutureListener.CLOSE);
 				System.out.print(chunk.getContent().toString(CharsetUtil.UTF_8));
 				System.out.flush();
 			}

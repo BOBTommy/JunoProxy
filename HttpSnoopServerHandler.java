@@ -20,6 +20,7 @@ import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelFuture;
 import org.jboss.netty.channel.ChannelFutureListener;
 import org.jboss.netty.channel.ChannelHandlerContext;
+import org.jboss.netty.channel.ChannelStateEvent;
 import org.jboss.netty.channel.ExceptionEvent;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
@@ -40,12 +41,14 @@ import org.jboss.netty.handler.codec.http.HttpVersion;
 import org.jboss.netty.handler.codec.http.QueryStringDecoder;
 import org.jboss.netty.util.CharsetUtil;
 
+
 public class HttpSnoopServerHandler extends SimpleChannelUpstreamHandler{
 
 	private HttpRequest request;
 	private boolean readingChunks;
 	private final StringBuilder buf = new StringBuilder();
 	ClientSocketChannelFactory cf;
+	private volatile Channel outChat;
 	
 	
 	public HttpSnoopServerHandler(ClientSocketChannelFactory cf){
@@ -53,18 +56,46 @@ public class HttpSnoopServerHandler extends SimpleChannelUpstreamHandler{
 	}
 	
 	@Override
+	public void channelOpen(ChannelHandlerContext ctx,ChannelStateEvent e)
+			throws Exception{
+		final Channel inboundChannel = e.getChannel();
+		inboundChannel.setReadable(false);
+		
+		ClientBootstrap cb = new ClientBootstrap(cf);
+		cb.getPipeline().addLast("handler", new HttpSnoopClientHandler(e.getChannel()));
+		ChannelFuture f = cb.connect(new InetSocketAddress("211.237.1.231", 80));
+		
+		outChat = f.getChannel();
+		f.addListener(new ChannelFutureListener() {
+			
+			@Override
+			public void operationComplete(ChannelFuture future) throws Exception {
+				if(future.isSuccess()){
+					inboundChannel.setReadable(true);
+				}else{
+					inboundChannel.close();
+				}
+				
+			}
+		});
+	}
+	
+	@Override
 	public void messageReceived(ChannelHandlerContext ctx, MessageEvent e )throws Exception {
 		if(!readingChunks){
 			HttpRequest request = this.request = (HttpRequest) e.getMessage();
+			this.outChat = e.getChannel();
 			
 			if(is100ContinueExpected(request)){
 				send100Continue(e);
 			}
+			
+			
 			//Printing Headers
 			buf.setLength(0);
 			buf.append("WELCOME TO THE WILD WILD WEB SERVER\r\n");
 			buf.append("===================================\r\n");
-			
+			/*
 			buf.append("VERSION: " + request.getProtocolVersion() + "\r\n");
 			buf.append("HOSTNAME: " + getHost(request, "unknown") + "\r\n");
 			buf.append("REQUEST_URI: " + request.getUri() + "\r\n\r\n");
@@ -75,7 +106,7 @@ public class HttpSnoopServerHandler extends SimpleChannelUpstreamHandler{
 				buf.append(h.getKey()+" = "+h.getValue()+"\r\n");
 			}
 			buf.append("\r\n");
-			
+			*/
 			/*
 			URI uri = new URI("http://kldp.org/");
 			
@@ -100,7 +131,7 @@ public class HttpSnoopServerHandler extends SimpleChannelUpstreamHandler{
 			
 			final ClientBootstrap cbootstrap = new ClientBootstrap(cf);
 			
-			cbootstrap.setPipelineFactory(new HttpSnoopClientPipelineFactory(ssl));
+			cbootstrap.setPipelineFactory(new HttpSnoopClientPipelineFactory(ssl,e.getChannel()));
 			
 			final ChannelFuture future = cbootstrap.connect(new InetSocketAddress(host, port));
 			
@@ -161,6 +192,7 @@ public class HttpSnoopServerHandler extends SimpleChannelUpstreamHandler{
 					buf.append("\r\n");
 				}
 			}
+			
 			if(request.isChunked()){
 				readingChunks = true;
 			}else{
@@ -168,8 +200,10 @@ public class HttpSnoopServerHandler extends SimpleChannelUpstreamHandler{
 				if(content.readable()){
 					buf.append("CONTENT: "+content.toString(CharsetUtil.UTF_8)+"\r\n");
 				}
+				
 				writeResponse(e);
 			}
+			
 		}else{
 			HttpChunk chunk = (HttpChunk) e.getMessage();
 			if(chunk.isLast()){
@@ -188,10 +222,13 @@ public class HttpSnoopServerHandler extends SimpleChannelUpstreamHandler{
 				}
 				
 				writeResponse(e);
+				
 			}else {
 				buf.append("CHUNK: "+chunk.getContent().toString(CharsetUtil.UTF_8)+"\r\n");
 			}
 		}
+		
+		
 	}
 	
 	private void writeResponse(MessageEvent e){
@@ -225,7 +262,8 @@ public class HttpSnoopServerHandler extends SimpleChannelUpstreamHandler{
 			response.addHeader(SET_COOKIE, cookieEncoder.encode());
 		}
 		
-		ChannelFuture future = e.getChannel().write(response);
+		ChannelFuture future = outChat.write(response);
+		//ChannelFuture future = e.getChannel().write(response);
 		
 		if(!keepAlive){
 			future.addListener(ChannelFutureListener.CLOSE);
