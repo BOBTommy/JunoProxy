@@ -95,10 +95,11 @@ public class HttpSnoopServerHandler extends SimpleChannelUpstreamHandler{
 			buf.setLength(0);
 			buf.append("WELCOME TO THE WILD WILD WEB SERVER\r\n");
 			buf.append("===================================\r\n");
-			/*
+			
 			buf.append("VERSION: " + request.getProtocolVersion() + "\r\n");
 			buf.append("HOSTNAME: " + getHost(request, "unknown") + "\r\n");
 			buf.append("REQUEST_URI: " + request.getUri() + "\r\n\r\n");
+			/*
 			URI uri = new URI("http://kldp.org/");
 			buf.append("URI: "+uri.getHost()+"\r\n\r\n");
 			
@@ -229,8 +230,10 @@ public class HttpSnoopServerHandler extends SimpleChannelUpstreamHandler{
 		}
 		
 		
+		
 	}
 	
+	// Parameter : Http Request
 	private void writeResponse(MessageEvent e){
 		boolean keepAlive = isKeepAlive(request);
 		
